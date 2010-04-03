@@ -14,7 +14,6 @@ test 'getters on object literals', ->
 
   ok obj.getter is 3
 
-###
 test 'getters on class instances', ->
   class Foo
     constructor: (@value) ->
@@ -32,7 +31,6 @@ test 'getters as class properties', ->
     get @getter: -> @value
 
   ok Foo.getter is 5
-###
 
 
 # Setters
@@ -45,7 +43,6 @@ test 'setters on object literals', ->
   obj.setter = 7
   ok obj.value is 7
 
-###
 test 'setters on class instances', ->
   class Foo
     value: 1
@@ -64,4 +61,3 @@ test 'setters as class properties', ->
 
   Foo.setter = 5
   ok Foo.value is 5
-###

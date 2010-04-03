@@ -790,6 +790,12 @@ exports.Class = class Class extends Base
 
   children: ['variable', 'parent', 'body']
 
+  # Mappings between **AssignNode**'s `control` property values and JavaScript
+  # methods.
+  control:
+    'get': '__defineGetter__'
+    'set': '__defineSetter__'
+
   # Figure out the appropriate name for the constructor function of this class.
   determineName: ->
     return null unless @variable
@@ -832,11 +838,21 @@ exports.Class = class Class extends Base
             throw new Error 'cannot define more than one constructor in a class'
           if func.bound
             throw new Error 'cannot define a constructor as a bound function'
+          if assign.control
+            throw new Error 'cannot define constructor as getter/setter'
           if func instanceof Code
             assign = @ctor = func
           else
             @externalCtor = o.scope.freeVariable 'class'
             assign = new Assign new Literal(@externalCtor), func
+        else if assign.control
+          definerName = new Literal(@control[assign.control.value])
+          if assign.variable.this
+            definer = new Value(new Literal(name), [new Access(definerName)])
+            assign = new Call(definer, [new Literal("\"#{assign.variable.properties[0].name.value}\""), func])
+          else
+            definer = new Value(new Literal(name), [new Access(definerName, 'proto')])
+            assign = new Call(definer, [new Literal("\"#{base.value}\""), func])
         else
           unless assign.variable.this
             assign.variable = new Value(new Literal(name), [new Access(base, 'proto')])
