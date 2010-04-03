@@ -895,6 +895,7 @@ exports.Class = class Class extends Base
 exports.Assign = class Assign extends Base
   constructor: (@variable, @value, @context, options) ->
     @param = options and options.param
+    @control = options?.control
 
   # Matchers for detecting class/method names
   METHOD_DEF: /^(?:(\S+)\.prototype\.|\S+?)?\b([$A-Za-z_][$\w\x7f-\uffff]*)$/
@@ -928,6 +929,7 @@ exports.Assign = class Assign extends Base
       @value.name  = match[2]
       @value.klass = match[1] if match[1]
     val = @value.compile o, LEVEL_LIST
+    return val.replace(/function[^\(]*/, "#{@control.compile o} #{name}").replace(/^\(+|\)+$/g, '') if @control
     return "#{name}: #{val}" if @context is 'object'
     val = name + " #{ @context or '=' } " + val
     if o.level <= LEVEL_LIST then val else "(#{val})"
@@ -1197,18 +1199,18 @@ exports.While = class While extends Base
   # return an array containing the computed result of each iteration.
   compileNode: (o) ->
     o.indent += TAB
-    set      = ''
+    set_pre  = ''
     {body}   = this
     if body.isEmpty()
       body = ''
     else
       if o.level > LEVEL_TOP or @returns
-        rvar = o.scope.freeVariable 'results'
-        set  = "#{@tab}#{rvar} = [];\n"
-        body = Push.wrap rvar, body if body
+        rvar    = o.scope.freeVariable 'results'
+        set_pre = "#{@tab}#{rvar} = [];\n"
+        body    = Push.wrap rvar, body if body
       body = Block.wrap [new If @guard, body] if @guard
       body = "\n#{ body.compile o, LEVEL_TOP }\n#{@tab}"
-    code = set + @tab + "while (#{ @condition.compile o, LEVEL_PAREN }) {#{body}}"
+    code = set_pre + @tab + "while (#{ @condition.compile o, LEVEL_PAREN }) {#{body}}"
     if @returns
       code += "\n#{@tab}return #{rvar};"
     code

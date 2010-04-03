@@ -503,7 +503,7 @@ exports.Lexer = class Lexer
 
 # Keywords that CoffeeScript shares in common with JavaScript.
 JS_KEYWORDS = [
-  'true', 'false', 'null', 'this'
+  'true', 'false', 'null', 'this', 'get', 'set'
   'new', 'delete', 'typeof', 'in', 'instanceof'
   'return', 'throw', 'break', 'continue', 'debugger'
   'if', 'else', 'switch', 'for', 'while', 'do', 'try', 'catch', 'finally'

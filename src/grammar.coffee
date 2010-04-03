@@ -138,13 +138,25 @@ grammar =
     o 'Assignable = INDENT Expression OUTDENT', -> new Assign $1, $4
   ]
 
+  # A control level applied to an assignment. This can be either a getter or a
+  # setter within an object literal or a class body.
+  AssignControl: [
+    o 'GET',                                    -> new Literal $1
+    o 'SET',                                    -> new Literal $1
+  ]
+
   # Assignment when it happens within an object literal. The difference from
   # the ordinary **Assign** is that these allow numbers and strings as keys.
   AssignObj: [
     o 'ObjAssignable',                          -> new Value $1
     o 'ObjAssignable : Expression',             -> new Assign new Value($1), $3, 'object'
+    o 'AssignControl
+       ObjAssignable : Code',                   -> new Assign new Value($2), $4, 'object', control: $1
     o 'ObjAssignable :
        INDENT Expression OUTDENT',              -> new Assign new Value($1), $4, 'object'
+    o 'AssignControl
+       ObjAssignable :
+       INDENT Code OUTDENT',                    -> new Assign new Value($2), $5, 'object', control: $1
     o 'Comment'
   ]
 

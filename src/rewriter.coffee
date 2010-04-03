@@ -97,13 +97,15 @@ class exports.Rewriter
     start       = null
     startIndent = 0
     condition = (token, i) ->
-      [one, two, three] = @tokens[i + 1 .. i + 3]
-      return false if 'HERECOMMENT' is one?[0]
+      next = @tag i + 1
+      return false if next is 'HERECOMMENT'
       [tag] = token
-      (tag in ['TERMINATOR', 'OUTDENT'] and
-        not (two?[0] is ':' or one?[0] is '@' and three?[0] is ':')) or
-        (tag is ',' and one and
-          one[0] not in ['IDENTIFIER', 'NUMBER', 'STRING', '@', 'TERMINATOR', 'OUTDENT'])
+      return true if tag is ',' and next not in ['IDENTIFIER', 'NUMBER', 'STRING', '@', 'GET', 'SET', 'TERMINATOR', 'OUTDENT']
+      return false unless tag in ['TERMINATOR', 'OUTDENT']
+      idx = 2
+      idx++ if next in ['GET', 'SET']
+      idx++ if @tag(i + idx - 1) is '@'
+      return true if @tag(i + idx) isnt ':'
     action = (token, i) ->
       tok = ['}', '}', token[2]]
       tok.generated = yes
@@ -115,10 +117,12 @@ class exports.Rewriter
       if tag in EXPRESSION_END
         start = stack.pop()
         return 1
+      ago = @tag idx = i - 2
+      ago = @tag idx = i - 3 if ago in ['@', 'GET', 'SET']
       return 1 unless tag is ':' and
-        ((ago = @tag i - 2) is ':' or stack[stack.length - 1]?[0] isnt '{')
+        (ago is ':' or stack[stack.length - 1]?[0] isnt '{')
       stack.push ['{']
-      idx =  if ago is '@' then i - 2 else i - 1
+      idx++
       idx -= 2 while @tag(idx - 2) is 'HERECOMMENT'
       value = new String('{')
       value.generated = yes
