@@ -276,23 +276,9 @@ grammar =
   Class: [
     o "CLASS SimpleAssignable",                 -> new ClassNode $2
     o "CLASS SimpleAssignable EXTENDS Value",   -> new ClassNode $2, $4
-    o "CLASS SimpleAssignable INDENT ClassBody OUTDENT", -> new ClassNode $2, null, $4
-    o "CLASS SimpleAssignable EXTENDS Value INDENT ClassBody OUTDENT", -> new ClassNode $2, $4, $6
-    o "CLASS INDENT ClassBody OUTDENT",         -> new ClassNode '__temp__', null, $3
-  ]
-
-  # Assignments that can happen directly inside a class declaration.
-  ClassAssign: [
-    o "AssignObj",                              -> $1
-    o "ThisProperty : Expression",              -> new AssignNode new ValueNode($1), $3, 'this'
-  ]
-
-  # A list of assignments to a class.
-  ClassBody: [
-    o "",                                       -> []
-    o "ClassAssign",                            -> [$1]
-    o "ClassBody TERMINATOR ClassAssign",       -> $1.concat $3
-    o "{ ClassBody }",                          -> $2
+    o "CLASS SimpleAssignable Block",           -> new ClassNode $2, null, $3
+    o "CLASS SimpleAssignable EXTENDS Value Block", -> new ClassNode $2, $4, $5
+    o "CLASS Block",                            -> new ClassNode '__temp__', null, $2
   ]
 
   # The three flavors of function call: normal, object instantiation with `new`,

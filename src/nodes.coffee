@@ -319,6 +319,9 @@ exports.ValueNode = class ValueNode extends BaseNode
   isSplice: ->
     @hasProperties() and @properties[@properties.length - 1] instanceof SliceNode
 
+  isThis: ->
+    @base.value is 'this' and @properties.length is 1
+
   makeReturn: ->
     if @hasProperties() then super() else @base.makeReturn()
 
@@ -695,19 +698,24 @@ exports.ArrayNode = class ArrayNode extends BaseNode
 exports.ClassNode = class ClassNode extends BaseNode
 
   class:        'ClassNode'
-  children:     ['variable', 'parent', 'properties']
+  children:     ['variable', 'parent', 'body']
   isStatement:  -> yes
 
   # Initialize a **ClassNode** with its name, an optional superclass, and a
   # list of prototype property assignments.
-  constructor: (@variable, @parent, @properties) ->
+  constructor: (@variable, @parent, @body) ->
     super()
-    @properties or= []
-    @returns    = false
+    @body     or= new Expressions()
+    @returns  =   false
 
   makeReturn: ->
     @returns = true
     this
+
+  # Short-circuit traverseChildren method to prevent it from crossing scope boundaries
+  # unless crossScope is true
+  traverseChildren: (crossScope, func) ->
+    super(crossScope, func) if crossScope
 
   # Instead of generating the JavaScript string directly, we build up the
   # equivalent syntax tree and compile that, in pieces. You can see the
@@ -716,6 +724,7 @@ exports.ClassNode = class ClassNode extends BaseNode
     @variable  = literal o.scope.freeVariable() if @variable is '__temp__'
     extension  = @parent and new ExtendsNode(@variable, @parent)
     props      = new Expressions
+    props.makeReturn = ->
     o.top      = true
     me         = null
     className  = @variable.compile o
@@ -729,36 +738,30 @@ exports.ClassNode = class ClassNode extends BaseNode
     else
       constructor = new CodeNode
 
-    for prop in @properties
-      [pvar, func] = [prop.variable, prop.value]
-      if pvar and pvar.base.value is 'constructor' and func instanceof CodeNode
-        throw new Error "cannot define a constructor as a bound function." if func.bound
-        func.name = className
-        func.body.push new ReturnNode literal 'this'
-        @variable = new ValueNode @variable
-        @variable.namespaced = include func.name, '.'
-        constructor = func
-        continue
-      if func instanceof CodeNode and func.bound
-        if prop.context is 'this'
-          func.context = className
-        else
+    for expr in @body.expressions
+      if expr instanceof AssignNode
+        [pvar, func] = [expr.variable, expr.value]
+        if pvar.isThis() and (pvar.properties[0].name.value is 'constructor') and func instanceof CodeNode
+          throw new Error "cannot define a constructor as a bound function." if func.bound
+          func.name = className
+          func.body.push new ReturnNode literal 'this'
+          @variable = new ValueNode @variable
+          @variable.namespaced = include func.name, '.'
+          constructor = func
+          continue
+        if pvar.isThis() and func instanceof CodeNode and func.bound
           func.bound = false
           constScope or= new Scope(o.scope, constructor.body, constructor)
           me or= constScope.freeVariable()
-          pname = pvar.compile(o)
+          name  = pvar.properties[0].name.value
           constructor.body.push    new ReturnNode literal 'this' if constructor.body.empty()
-          constructor.body.unshift literal "this.#{pname} = function(){ return #{className}.prototype.#{pname}.apply(#{me}, arguments); }"
-      if pvar
-        access = if prop.context is 'this' then pvar.base.properties[0] else new AccessorNode(pvar, 'prototype')
-        val    = new ValueNode(@variable, [access])
-        prop   = new AssignNode(val, func)
-      props.push prop
+          constructor.body.unshift literal "this.#{name} = function(){ return #{className}.prototype.#{name}.apply(#{me}, arguments); }"
+      props.push expr
 
     constructor.body.unshift literal "#{me} = this" if me
     construct = @idt() + (new AssignNode(@variable, constructor)).compile(merge o, {sharedScope: constScope}) + ';'
-    props     = if !props.empty() then '\n' + props.compile(o)                     else ''
-    extension = if extension      then '\n' + @idt() + extension.compile(o) + ';'  else ''
+    props     = if !props.empty() then '\n' + @tab + '(function() {\n' + props.compile(merge(o, {indent : @idt(1)})) + "\n#{@tab}}).call(#{className}.prototype);" else ''
+    extension = if extension      then '\n' + @tab + extension.compile(o) + ';'  else ''
     returns   = if @returns       then '\n' + new ReturnNode(@variable).compile(o) else ''
     construct + extension + props + returns
 
